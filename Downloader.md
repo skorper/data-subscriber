@@ -6,9 +6,8 @@ For installation and dependency information, please see the [top-level README](R
 
 ```
 $> podaac-data-downloader -h
-usage: PO.DAAC bulk-data downloader [-h] -c COLLECTION -d OUTPUTDIRECTORY [--cycle SEARCH_CYCLES] [-sd STARTDATE] [-ed ENDDATE]
-                                    [-b BBOX] [-dc] [-dydoy] [-dymd] [-dy] [--offset OFFSET] [-e EXTENSIONS] [--process PROCESS_CMD]
-                                    [--version] [--verbose] [-p PROVIDER] [--limit LIMIT]
+usage: PO.DAAC bulk-data downloader [-h] -c COLLECTION -d OUTPUTDIRECTORY [--cycle SEARCH_CYCLES] [-sd STARTDATE] [-ed ENDDATE] [-b BBOX] [-dc] [-dydoy] [-dymd] [-dy] [--offset OFFSET] [-e EXTENSIONS] [--process PROCESS_CMD] [--version] [--verbose]
+                                    [-p PROVIDER] [--limit LIMIT] [--parallel PARALLEL]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -41,6 +40,7 @@ optional arguments:
   -p PROVIDER, --provider PROVIDER
                         Specify a provider for collection search. Default is POCLOUD.
   --limit LIMIT         Integer limit for number of granules to download. Useful in testing. Defaults to 2000
+  --parallel PARALLEL   Number of parallel processes to use when downloading data
 
 ```
 
@@ -52,7 +52,7 @@ Usage:
 ```
 usage: PO.DAAC bulk-data downloader [-h] -c COLLECTION -d OUTPUTDIRECTORY [--cycle SEARCH_CYCLES] [-sd STARTDATE] [-ed ENDDATE]
                                     [-b BBOX] [-dc] [-dydoy] [-dymd] [-dy] [--offset OFFSET] [-e EXTENSIONS] [--process PROCESS_CMD]
-                                    [--version] [--verbose] [-p PROVIDER] [--limit LIMIT]
+                                    [--version] [--verbose] [-p PROVIDER] [--limit LIMIT] [--parallel PARALLEL]
 ```
 
 To run the script, the following parameters are required:
@@ -198,7 +198,9 @@ podaac-data-subscriber -c VIIRS_N20-OSPO-L2P-v2.61 -d ./data -e .nc -e .h5 -sd 2
 
 Using the `--process` option, you can run a simple command agaisnt the "just" downloaded file. This will take the format of "<command> <path/to/file>". This means you can run a command like `--process gzip` to gzip all downloaded files. We do not support more advanced processes at this time (piping, running a process on a directory, etc).
 
+### Enabling concurrent download
 
+In order to speed up data download, the `--parallel` parameter may be used, along with the number of threads to use. For example: `--parallel 5` would run the PO.DAAC data downloader with 5 threads.
 
 ### In need of Help?
 The PO.DAAC User Services Office is the primary point of contact for answering your questions concerning data and information held by the PO.DAAC. User Services staff members are knowledgeable about both the data ordering system and the data products themselves. We answer questions about data, route requests to other DAACs, and direct questions we cannot answer to the appropriate information source.
