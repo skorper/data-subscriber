@@ -2,10 +2,13 @@
 import argparse
 import logging
 import os
+import shutil
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta
 from os import makedirs
 from os.path import isdir, basename, join
-from urllib.request import urlretrieve
-from datetime import datetime, timedelta
+
+import urllib3
 
 from subscriber import podaac_access as pa
 
@@ -80,6 +83,7 @@ def create_parser():
     parser.add_argument("-p", "--provider", dest="provider", default='POCLOUD', help="Specify a provider for collection search. Default is POCLOUD.")    # noqa E501
 
     parser.add_argument("--limit", dest="limit", default='2000', type=int, help="Integer limit for number of granules to download. Useful in testing. Defaults to " + str(page_size))    # noqa E501
+    parser.add_argument("--parallel", dest="parallel", default=1, type=int, help="Number of parallel processes to use when downloading data")    # noqa E501
 
     return parser
 
@@ -112,6 +116,7 @@ def run():
     extensions = args.extensions
     process_cmd = args.process_cmd
     data_path = args.outputDirectory
+    parallel = args.parallel
 
     if args.limit is not None:
         page_size = args.limit
@@ -215,27 +220,52 @@ def run():
     # NEED TO REFACTOR THIS, A LOT OF STUFF in here
     # Finish by downloading the files to the data directory in a loop.
     # Overwrite `.update` with a new timestamp on success.
-    success_cnt = failure_cnt = 0
-    for f in downloads:
+    def download(url, output_path, connection_manager):
+        """
+        Download a file to the local disk.
+
+        Parameters
+        ----------
+        url : str
+            The url of the file to download locally
+        output_path : str
+            The location to download the file locally
+        connection_manager : urllib3.PoolManager
+            Pool manager used to make request. This enables thread-safe
+            download.
+        """
         try:
+            with connection_manager.request(
+                    'GET', url, preload_content=False
+            ) as resp, open(output_path, 'wb') as out_file:
+                shutil.copyfileobj(resp, out_file)
+            resp.release_conn()
+            pa.process_file(process_cmd, output_path, args)
+            return True
+        except Exception as e:
+            print(f'Failed to download: {e}')
+            return False
+
+    connection_manager = urllib3.PoolManager(maxsize=parallel)
+    futures = []
+    with ThreadPoolExecutor(parallel) as thread_pool:
+        for file_url in downloads:
             # -d flag, args.outputDirectory
-            output_path = join(data_path, basename(f))
+            output_path = join(data_path, basename(file_url))
             # -dy, args.dy, -dydoy, args.dydoy and -dymd, args.dymd
             if any([args.dy, args.dydoy, args.dymd]):
                 output_path = pa.prepare_time_output(
-                    file_start_times, data_path, f, args, ts_shift)
+                    file_start_times, data_path, file_url, args, ts_shift)
             # -dc flag
             if args.cycle:
                 output_path = pa.prepare_cycles_output(
-                    cycles, data_path, f)
-            urlretrieve(f, output_path)
-            pa.process_file(process_cmd, output_path, args)
-            print(str(datetime.now()) + " SUCCESS: " + f)
-            success_cnt = success_cnt + 1
-        except Exception as e:
-            print(str(datetime.now()) + " FAILURE: " + f)
-            failure_cnt = failure_cnt + 1
-            print(e)
+                    cycles, data_path, file_url)
+            future = thread_pool.submit(download, file_url, output_path, connection_manager)
+            futures.append(future)
+
+    results = [future.result() for future in futures]
+    success_cnt = sum(results)
+    failure_cnt = len(downloads) - sum(results)
 
     print("Downloaded: " + str(success_cnt) + " files\n")
     print("Files Failed to download:" + str(failure_cnt) + "\n")
