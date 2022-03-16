@@ -241,9 +241,10 @@ def run():
                 shutil.copyfileobj(resp, out_file)
             resp.release_conn()
             pa.process_file(process_cmd, output_path, args)
+            print(f"{datetime.now()} SUCCESS: {url}")
             return True
-        except Exception as e:
-            print(f'Failed to download: {e}')
+        except Exception:
+            print(f"{datetime.now()} FAILURE: {url}")
             return False
 
     connection_manager = urllib3.PoolManager(maxsize=parallel)
